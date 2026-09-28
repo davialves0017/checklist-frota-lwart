@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, Camera, CheckCircle2, ClipboardCheck, KeyRound, Loader2, LogOut, Search, Truck } from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, ClipboardCheck, KeyRound, Loader2, LogOut, Search, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,8 @@ type Data = { inspections: Inspection[]; problems: Problem[] };
 
 export function DashboardClient() {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
-  const [pin, setPin] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [data, setData] = useState<Data>({ inspections: [], problems: [] });
   const [loading, setLoading] = useState(false);
@@ -40,10 +41,10 @@ export function DashboardClient() {
   async function login(event: React.FormEvent) {
     event.preventDefault(); setLoading(true); setLoginError("");
     try {
-      const response = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pin }) });
+      const response = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password }) });
       if (!response.ok) { const body = await response.json(); throw new Error(body.error); }
-      setPin(""); await load();
-    } catch (error) { setLoginError(error instanceof Error ? error.message : "Código incorreto."); } finally { setLoading(false); }
+      setUsername(""); setPassword(""); await load();
+    } catch (error) { setLoginError(error instanceof Error ? error.message : "Login ou senha incorretos."); } finally { setLoading(false); }
   }
   async function logout() { await fetch("/api/admin/logout", { method: "POST" }); setAuthorized(false); setData({ inspections: [], problems: [] }); }
 
@@ -56,7 +57,7 @@ export function DashboardClient() {
   const problemsByInspection = useMemo(() => new Map(data.inspections.map((inspection) => [inspection.id, data.problems.filter((problem) => problem.inspectionId === inspection.id)])), [data]);
 
   if (authorized === null || (loading && authorized === null)) return <div className="grid min-h-[55vh] place-items-center"><Loader2 className="h-8 w-8 animate-spin text-[#0b91ad]" /></div>;
-  if (!authorized) return <div className="mx-auto max-w-md px-4 py-16"><Card className="border-[#cbdde6] shadow-[0_20px_60px_rgba(18,52,90,.1)]"><CardContent className="p-7"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#e3f5f9] text-[#087b93]"><KeyRound /></div><h2 className="mt-5 text-center text-2xl font-bold text-[#12345a]">Acesso ao painel</h2><p className="mt-2 text-center text-[#587083]">Digite o código de administrador.</p><form onSubmit={login} className="mt-6 space-y-4"><Input value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" type="password" placeholder="Código com 6 números" className="h-12 text-center text-xl tracking-[.35em]" autoFocus />{loginError && <p className="text-center text-sm font-medium text-[#a2262e]">{loginError}</p>}<Button className="h-12 w-full bg-[#12345a]" disabled={pin.length !== 6 || loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Entrar</Button></form></CardContent></Card></div>;
+  if (!authorized) return <div className="mx-auto max-w-md px-4 py-16"><Card className="border-[#cbdde6] shadow-[0_20px_60px_rgba(18,52,90,.1)]"><CardContent className="p-7"><div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#e3f5f9] text-[#087b93]"><KeyRound /></div><h2 className="mt-5 text-center text-2xl font-bold text-[#12345a]">Acesso administrativo</h2><p className="mt-2 text-center text-[#587083]">Entre com seu login e senha para abrir o painel.</p><form onSubmit={login} className="mt-6 space-y-4"><label><span className="mb-2 block text-sm font-semibold text-[#27465d]">Login</span><Input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" placeholder="Seu login" className="h-12" autoFocus /></label><label><span className="mb-2 block text-sm font-semibold text-[#27465d]">Senha</span><Input value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" type="password" placeholder="Sua senha" className="h-12" /></label>{loginError && <p className="text-center text-sm font-medium text-[#a2262e]">{loginError}</p>}<Button className="h-12 w-full bg-[#12345a]" disabled={!username.trim() || !password || loading}>{loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Entrar</Button></form></CardContent></Card></div>;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">

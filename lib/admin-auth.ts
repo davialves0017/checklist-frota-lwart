@@ -9,13 +9,19 @@ async function digest(value: string) {
 }
 
 export async function expectedAdminToken() {
-  if (!env.ADMIN_PIN || !env.ADMIN_SESSION_SECRET) throw new Error("Configuração administrativa indisponível.");
-  return digest(`${env.ADMIN_PIN}:${env.ADMIN_SESSION_SECRET}`);
+  if (!env.ADMIN_USERNAME || !env.ADMIN_PASSWORD || !env.ADMIN_SESSION_SECRET) throw new Error("Configuração administrativa indisponível.");
+  return digest(`${env.ADMIN_USERNAME}:${env.ADMIN_PASSWORD}:${env.ADMIN_SESSION_SECRET}`);
 }
 
-export async function validateAdminPin(pin: string) {
-  if (!env.ADMIN_PIN) return false;
-  return digest(pin) === digest(env.ADMIN_PIN);
+export async function validateAdminCredentials(username: string, password: string) {
+  if (!env.ADMIN_USERNAME || !env.ADMIN_PASSWORD) return false;
+  const [submittedUser, expectedUser, submittedPassword, expectedPassword] = await Promise.all([
+    digest(username.trim().toLowerCase()),
+    digest(env.ADMIN_USERNAME.trim().toLowerCase()),
+    digest(password),
+    digest(env.ADMIN_PASSWORD),
+  ]);
+  return submittedUser === expectedUser && submittedPassword === expectedPassword;
 }
 
 export async function isAdminRequest(request: Request) {
