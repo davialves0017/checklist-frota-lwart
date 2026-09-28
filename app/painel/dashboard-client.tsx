@@ -43,7 +43,7 @@ export function DashboardClient() {
     try {
       const response = await fetch("/api/admin/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username, password }) });
       if (!response.ok) { const body = await response.json(); throw new Error(body.error); }
-      setUsername(""); setPassword(""); await load();
+      window.location.reload();
     } catch (error) { setLoginError(error instanceof Error ? error.message : "Login ou senha incorretos."); } finally { setLoading(false); }
   }
   async function logout() { await fetch("/api/admin/logout", { method: "POST" }); setAuthorized(false); setData({ inspections: [], problems: [] }); }
