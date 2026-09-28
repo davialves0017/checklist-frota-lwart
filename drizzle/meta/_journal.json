@@ -15,6 +15,13 @@
       "when": 1790603757597,
       "tag": "0001_icy_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790623226468,
+      "tag": "0002_cooing_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

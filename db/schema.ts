@@ -48,3 +48,8 @@ export const inspectionAnswers = sqliteTable(
     index("idx_answers_problem").on(table.isProblem),
   ],
 );
+
+export const drivers = sqliteTable("drivers", {
+  name: text("name").primaryKey(),
+  createdAt: text("created_at").notNull(),
+});
