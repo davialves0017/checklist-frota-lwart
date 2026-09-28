@@ -1,4 +1,4 @@
-export type ChecklistItem = { number: number; question: string; kind?: "boolean" | "date" | "number" };
+export type ChecklistItem = { number: number; question: string; kind?: "boolean" | "date" | "number"; problemResponse?: "sim" | "nao" };
 
 export const quinzenalItems: ChecklistItem[] = [
   { number: 1, question: "Pasta de documentos está organizada e limpa? Contém o cartão Ecofrotas?" },
@@ -80,4 +80,19 @@ export const mensalItems: ChecklistItem[] = [
   { number: 49, question: "Plaqueta do para-choque está legível e em boas condições?" },
 ];
 
-export function getChecklist(type: string) { return type === "mensal" ? mensalItems : quinzenalItems; }
+export const trocaCaminhaoItems: ChecklistItem[] = [
+  { number: 1, question: "Existe alguma observação sobre o caminhão?", problemResponse: "sim" },
+  { number: 2, question: "O CCO de sobra está sendo enviado preenchido?" },
+];
+
+export function getChecklist(type: string) {
+  if (type === "mensal") return mensalItems;
+  if (type === "troca_caminhao") return trocaCaminhaoItems;
+  return quinzenalItems;
+}
+
+export function checklistLabel(type: string) {
+  if (type === "mensal") return "Mensal";
+  if (type === "troca_caminhao") return "Troca de caminhão";
+  return "Quinzenal";
+}
