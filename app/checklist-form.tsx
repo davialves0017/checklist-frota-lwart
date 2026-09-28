@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { mensalItems, quinzenalItems } from "@/lib/checklists";
+import { fleetByNumber, fleetVehicles } from "@/lib/fleets";
 import { SignaturePad } from "./signature-pad";
 
 type ChecklistType = "quinzenal" | "mensal";
@@ -20,7 +21,9 @@ export function ChecklistForm() {
   const [stage, setStage] = useState<"choose" | "identity" | "questions" | "evidence" | "success">("choose");
   const [questionIndex, setQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, Answer>>({});
-  const [identity, setIdentity] = useState({ inspectorName: "", inspectionDate: today, km: "", fleet: "", plate: "", branch: "" });
+  const [identity, setIdentity] = useState({ inspectorName: "", inspectionDate: today, km: "", fleet: "", plate: "", branch: "Goiânia" });
+  const [rememberName, setRememberName] = useState(true);
+  const [issuePhotos, setIssuePhotos] = useState<Record<number, File | null>>({});
   const [photo, setPhoto] = useState<File | null>(null);
   const [signature, setSignature] = useState<Blob | null>(null);
   const [accepted, setAccepted] = useState(false);
@@ -33,6 +36,8 @@ export function ChecklistForm() {
   const progress = stage === "questions" ? ((questionIndex + 1) / items.length) * 100 : stage === "evidence" || stage === "success" ? 100 : stage === "identity" ? 8 : 0;
 
   useEffect(() => {
+    const savedName = window.localStorage.getItem("lwart_collector_name");
+    if (savedName) setIdentity((value) => ({ ...value, inspectorName: savedName }));
     const context = (document as Document & { modelContext?: { registerTool?: (tool: unknown, options?: { signal?: AbortSignal }) => unknown } }).modelContext;
     if (!context?.registerTool) return;
     const controller = new AbortController();
@@ -45,12 +50,14 @@ export function ChecklistForm() {
   const identityComplete = Object.values(identity).every(Boolean) && Number(identity.km) >= 0;
   const answerComplete = useMemo(() => {
     if (!current || !currentAnswer?.response) return false;
-    return !(current.kind !== "date" && current.kind !== "number" && currentAnswer.response === "nao" && !currentAnswer.comment.trim());
-  }, [current, currentAnswer]);
+    return !(current.kind !== "date" && current.kind !== "number" && currentAnswer.response === "nao" && !currentAnswer.comment.trim() && !issuePhotos[current.number]);
+  }, [current, currentAnswer, issuePhotos]);
 
   function selectType(value: ChecklistType) { setType(value); setStage("identity"); setAnswers({}); setQuestionIndex(0); }
   function updateAnswer(response: string) { if (!current) return; setAnswers((state) => ({ ...state, [current.number]: { itemNumber: current.number, response, comment: state[current.number]?.comment ?? "" } })); }
   function updateComment(comment: string) { if (!current) return; setAnswers((state) => ({ ...state, [current.number]: { itemNumber: current.number, response: state[current.number]?.response ?? "", comment } })); }
+  function updateFleet(fleet: string) { const vehicle = fleetByNumber.get(fleet.trim()); setIdentity((value) => ({ ...value, fleet, plate: vehicle?.plate ?? "" })); }
+  function startQuestions() { if (!identityComplete) return; if (rememberName) window.localStorage.setItem("lwart_collector_name", identity.inspectorName.trim()); else window.localStorage.removeItem("lwart_collector_name"); setStage("questions"); setQuestionIndex(0); }
   function nextQuestion() { if (!answerComplete) return; if (questionIndex === items.length - 1) setStage("evidence"); else setQuestionIndex((value) => value + 1); }
   function previous() { if (stage === "identity") setStage("choose"); else if (stage === "questions" && questionIndex === 0) setStage("identity"); else if (stage === "questions") setQuestionIndex((value) => value - 1); else if (stage === "evidence") { setStage("questions"); setQuestionIndex(items.length - 1); } }
 
@@ -62,6 +69,7 @@ export function ChecklistForm() {
       data.append("payload", JSON.stringify({ checklistType: type, ...identity, km: Number(identity.km), answers: items.map((item) => answers[item.number]) }));
       data.append("photo", photo, "responsavel.jpg");
       data.append("signature", signature, "assinatura.png");
+      for (const item of items) { const issuePhoto = issuePhotos[item.number]; if (answers[item.number]?.response === "nao" && issuePhoto) data.append(`itemPhoto_${item.number}`, issuePhoto, issuePhoto.name); }
       const response = await fetch("/api/inspections", { method: "POST", body: data });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || "Não foi possível salvar.");
@@ -69,7 +77,7 @@ export function ChecklistForm() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Não foi possível salvar."); } finally { setSending(false); }
   }
 
-  function restart() { setType(null); setStage("choose"); setAnswers({}); setQuestionIndex(0); setIdentity({ inspectorName: "", inspectionDate: today, km: "", fleet: "", plate: "", branch: "" }); setPhoto(null); setSignature(null); setAccepted(false); setResult(null); }
+  function restart() { const savedName = window.localStorage.getItem("lwart_collector_name") ?? ""; setType(null); setStage("choose"); setAnswers({}); setIssuePhotos({}); setQuestionIndex(0); setIdentity({ inspectorName: savedName, inspectionDate: today, km: "", fleet: "", plate: "", branch: "Goiânia" }); setPhoto(null); setSignature(null); setAccepted(false); setResult(null); }
 
   return (
     <section className="safe-bottom mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
@@ -82,17 +90,17 @@ export function ChecklistForm() {
       </div>}
 
       {stage === "identity" && <Card className="border-[#cbdde6] shadow-[0_20px_60px_rgba(18,52,90,.08)]"><CardContent className="p-5 sm:p-7"><div className="mb-6 flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#e0f5f9] text-[#087b93]"><Truck /></div><div><h2 className="text-xl font-bold text-[#12345a]">Identificação</h2><p className="text-sm text-[#587083]">Dados do responsável e do veículo</p></div></div><div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Nome de quem está preenchendo" className="sm:col-span-2"><Input required value={identity.inspectorName} onChange={(e) => setIdentity({ ...identity, inspectorName: e.target.value })} placeholder="Nome completo" /></Field>
+        <Field label="Nome de quem está preenchendo" className="sm:col-span-2"><Input required value={identity.inspectorName} onChange={(e) => setIdentity({ ...identity, inspectorName: e.target.value })} placeholder="Nome completo" /><label className="mt-3 flex items-center gap-2 text-sm text-[#587083]"><input type="checkbox" checked={rememberName} onChange={(e) => setRememberName(e.target.checked)} className="h-4 w-4 accent-[#0b91ad]" />Lembrar meu nome neste aparelho</label></Field>
         <Field label="Data"><Input type="date" required value={identity.inspectionDate} onChange={(e) => setIdentity({ ...identity, inspectionDate: e.target.value })} /></Field>
         <Field label="Quilometragem"><Input type="number" inputMode="numeric" min="0" required value={identity.km} onChange={(e) => setIdentity({ ...identity, km: e.target.value })} placeholder="Ex.: 125430" /></Field>
-        <Field label="Frota"><Input required value={identity.fleet} onChange={(e) => setIdentity({ ...identity, fleet: e.target.value })} placeholder="Número da frota" /></Field>
-        <Field label="Placa"><Input required value={identity.plate} onChange={(e) => setIdentity({ ...identity, plate: e.target.value.toUpperCase() })} placeholder="ABC1D23" /></Field>
-        <Field label="Filial" className="sm:col-span-2"><Input required value={identity.branch} onChange={(e) => setIdentity({ ...identity, branch: e.target.value })} placeholder="Nome da filial" /></Field>
-      </div><NavButtons onBack={previous} onNext={() => { if (identityComplete) { setStage("questions"); setQuestionIndex(0); } }} nextDisabled={!identityComplete} /></CardContent></Card>}
+        <Field label="Frota"><Input required list="fleet-options" value={identity.fleet} onChange={(e) => updateFleet(e.target.value)} placeholder="Digite ou selecione a frota" /><datalist id="fleet-options">{fleetVehicles.map((vehicle) => <option key={vehicle.fleet} value={vehicle.fleet}>{vehicle.plate} · {vehicle.type}</option>)}</datalist></Field>
+        <Field label="Placa"><Input required value={identity.plate} onChange={(e) => setIdentity({ ...identity, plate: e.target.value.toUpperCase().replace(/\s/g, "") })} placeholder="Preenchida pela frota" /></Field>
+        <Field label="Filial" className="sm:col-span-2"><Input required readOnly value={identity.branch} className="bg-[#eef5f7] font-semibold text-[#27465d]" /></Field>
+      </div><NavButtons onBack={previous} onNext={startQuestions} nextDisabled={!identityComplete} /></CardContent></Card>}
 
       {stage === "questions" && current && <Card className="overflow-hidden border-[#cbdde6] shadow-[0_20px_60px_rgba(18,52,90,.08)]"><div className="flex items-center justify-between border-b border-[#d6e3e9] bg-[#12345a] px-5 py-4 text-white"><span className="font-semibold">Item {current.number}</span><span className="text-sm text-[#bfeaf2]">{questionIndex + 1} de {items.length}</span></div><CardContent className="p-5 sm:p-8"><h2 className="text-xl font-bold leading-snug text-[#12345a] sm:text-2xl">{current.question}</h2><div className="mt-7">
         {current.kind === "date" ? <Input type="date" className="h-12" value={currentAnswer?.response ?? ""} onChange={(e) => updateAnswer(e.target.value)} /> : current.kind === "number" ? <Input type="number" inputMode="numeric" min="0" className="h-12" placeholder="Informe a quilometragem" value={currentAnswer?.response ?? ""} onChange={(e) => updateAnswer(e.target.value)} /> : <RadioGroup value={currentAnswer?.response ?? ""} onValueChange={updateAnswer} className="grid grid-cols-2 gap-3"><Choice id={`yes-${current.number}`} value="sim" label="Sim" tone="good" /><Choice id={`no-${current.number}`} value="nao" label="Não" tone="bad" /></RadioGroup>}
-        {currentAnswer?.response === "nao" && <div className="mt-5 rounded-xl border border-[#efc2c5] bg-[#fff4f4] p-4"><label className="mb-2 block font-semibold text-[#8c252c]">Descreva o problema encontrado</label><Textarea value={currentAnswer.comment} onChange={(e) => updateComment(e.target.value)} placeholder="Informe a irregularidade para o plano de ação" className="min-h-28 bg-white" /><p className="mt-2 text-sm text-[#8c4b4f]">A observação é obrigatória quando a resposta for “Não”.</p></div>}
+        {currentAnswer?.response === "nao" && <div className="mt-5 rounded-xl border border-[#efc2c5] bg-[#fff4f4] p-4"><p className="font-semibold text-[#8c252c]">Adicione uma foto ou descreva o problema</p><Textarea value={currentAnswer.comment} onChange={(e) => updateComment(e.target.value)} placeholder="Observação para o plano de ação" className="mt-3 min-h-24 bg-white" /><label className="mt-3 flex min-h-20 cursor-pointer items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[#d9a8ac] bg-white p-3 text-center text-sm font-semibold text-[#8c252c]"><Camera className="h-5 w-5" />{issuePhotos[current.number]?.name ?? "Tirar ou escolher foto do problema"}<input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => setIssuePhotos((state) => ({ ...state, [current.number]: e.target.files?.[0] ?? null }))} /></label><p className="mt-2 text-sm text-[#8c4b4f]">Para continuar, informe pelo menos uma foto ou uma observação.</p></div>}
       </div><NavButtons onBack={previous} onNext={nextQuestion} nextDisabled={!answerComplete} nextLabel={questionIndex === items.length - 1 ? "Ir para assinatura" : "Próximo item"} /></CardContent></Card>}
 
       {stage === "evidence" && <Card className="border-[#cbdde6] shadow-[0_20px_60px_rgba(18,52,90,.08)]"><CardContent className="space-y-7 p-5 sm:p-8"><div><h2 className="text-2xl font-bold text-[#12345a]">Confirmação</h2><p className="mt-1 text-[#587083]">A foto e a assinatura ficam ligadas a este preenchimento.</p></div><div><label className="mb-2 block font-semibold text-[#12345a]">Foto de quem preencheu</label><label className="flex min-h-32 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#9db8c7] bg-[#f8fcfd] p-5 text-center transition hover:border-[#0ba6c7]"><Camera className="mb-2 h-7 w-7 text-[#0b91ad]" /><span className="font-semibold text-[#12345a]">{photo ? photo.name : "Abrir câmera ou escolher foto"}</span><span className="mt-1 text-sm text-[#587083]">A imagem será usada para confirmar o responsável.</span><input type="file" accept="image/*" capture="user" className="sr-only" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} /></label></div><SignaturePad onChange={setSignature} /><label className="flex items-start gap-3 rounded-xl bg-[#eaf4f8] p-4 text-sm leading-relaxed text-[#27465d]"><input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-1 h-5 w-5 accent-[#0b91ad]" /><span>Declaro que as informações prestadas são verdadeiras e estou ciente das responsabilidades previstas no Código de Conduta do Processo de Coleta.</span></label>{error && <p role="alert" className="rounded-xl bg-[#fff0f1] p-3 font-medium text-[#a2262e]">{error}</p>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"><Button variant="outline" className="h-12" onClick={previous} disabled={sending}><ChevronLeft className="mr-2 h-4 w-4" />Voltar</Button><Button className="h-12 bg-[#0b91ad] px-6 hover:bg-[#087b93]" onClick={submit} disabled={!photo || !signature || !accepted || sending}>{sending ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CheckCircle2 className="mr-2 h-5 w-5" />}Finalizar check-list</Button></div></CardContent></Card>}

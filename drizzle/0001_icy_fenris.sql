@@ -1,0 +1,1 @@
+ALTER TABLE `inspection_answers` ADD `evidence_key` text;

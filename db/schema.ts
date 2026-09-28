@@ -40,6 +40,7 @@ export const inspectionAnswers = sqliteTable(
     question: text("question").notNull(),
     response: text("response").notNull(),
     comment: text("comment").notNull().default(""),
+    evidenceKey: text("evidence_key"),
     isProblem: integer("is_problem", { mode: "boolean" }).notNull().default(false),
   },
   (table) => [
