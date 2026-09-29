@@ -24,11 +24,16 @@ export async function GET(request: Request) {
   if (!env.DB || !env.BUCKET) return new Response("Armazenamento indisponível", { status: 503 });
 
   const month = new URL(request.url).searchParams.get("month") ?? "";
+  const checklistType = new URL(request.url).searchParams.get("type") ?? "todos";
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return new Response("Mês inválido", { status: 400 });
+  if (!["todos", "quinzenal", "mensal"].includes(checklistType)) return new Response("Tipo de check-list inválido", { status: 400 });
   const [year, monthNumber] = month.split("-").map(Number);
   const start = `${month}-01`;
   const end = monthNumber === 12 ? `${year + 1}-01-01` : `${year}-${String(monthNumber + 1).padStart(2, "0")}-01`;
-  const result = await env.DB.prepare(`SELECT id, checklist_type AS checklistType, inspector_name AS inspectorName, inspection_date AS inspectionDate, km, fleet, plate, branch, photo_key AS photoKey, signature_key AS signatureKey, problem_count AS problemCount FROM inspections WHERE inspection_date >= ? AND inspection_date < ? ORDER BY inspection_date, created_at`).bind(start, end).all<InspectionRow>();
+  const baseQuery = `SELECT id, checklist_type AS checklistType, inspector_name AS inspectorName, inspection_date AS inspectionDate, km, fleet, plate, branch, photo_key AS photoKey, signature_key AS signatureKey, problem_count AS problemCount FROM inspections WHERE inspection_date >= ? AND inspection_date < ?`;
+  const result = checklistType === "todos"
+    ? await env.DB.prepare(`${baseQuery} ORDER BY inspection_date, created_at`).bind(start, end).all<InspectionRow>()
+    : await env.DB.prepare(`${baseQuery} AND checklist_type = ? ORDER BY inspection_date, created_at`).bind(start, end, checklistType).all<InspectionRow>();
   if (!result.results.length) return new Response("Nenhum check-list encontrado neste mês", { status: 404 });
 
   const pdf = await PDFDocument.create();
@@ -73,7 +78,8 @@ export async function GET(request: Request) {
   }
 
   const bytes = await pdf.save();
-  return new Response(bytes, { headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="checklists-${month}.pdf"`, "cache-control": "private, no-store" } });
+  const typeSuffix = checklistType === "todos" ? "todos" : checklistType;
+  return new Response(bytes, { headers: { "content-type": "application/pdf", "content-disposition": `attachment; filename="checklists-${typeSuffix}-${month}.pdf"`, "cache-control": "private, no-store" } });
 }
 
 function drawHeader(page: PDFPage, font: PDFFont, inspection: InspectionRow) {

@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       }),
     ]);
     const statements = [
-      env.DB.prepare(`INSERT INTO inspections (id, checklist_type, inspector_name, inspection_date, km, fleet, plate, branch, photo_key, signature_key, total_items, problem_count, action_status, action_plan, action_owner, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendente', '', '', ?)`).bind(id, payload.checklistType, normalizeDriverName(payload.inspectorName), payload.inspectionDate, Number(payload.km), vehicle.fleet, vehicle.plate, "Goiânia", photoKey, signatureKey, items.length, problemCount, now),
+      env.DB.prepare(`INSERT INTO inspections (id, checklist_type, inspector_name, inspection_date, km, fleet, plate, branch, photo_key, signature_key, total_items, problem_count, action_status, action_plan, action_owner, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', '', ?)`).bind(id, payload.checklistType, normalizeDriverName(payload.inspectorName), payload.inspectionDate, Number(payload.km), vehicle.fleet, vehicle.plate, "Goiânia", photoKey, signatureKey, items.length, problemCount, problemCount > 0 ? "pendente" : "executado", now),
       env.DB.prepare(`INSERT OR IGNORE INTO drivers (name, created_at) VALUES (?, ?)`).bind(normalizeDriverName(payload.inspectorName), now),
       ...answers.map((answer) => env.DB!.prepare(`INSERT INTO inspection_answers (inspection_id, item_number, question, response, comment, evidence_key, is_problem) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(id, answer.itemNumber, answer.question, answer.response, answer.comment?.trim() ?? "", answer.evidenceKey, answer.isProblem ? 1 : 0)),
     ];
