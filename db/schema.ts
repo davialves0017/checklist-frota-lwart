@@ -53,3 +53,14 @@ export const drivers = sqliteTable("drivers", {
   name: text("name").primaryKey(),
   createdAt: text("created_at").notNull(),
 });
+
+export const adminUsers = sqliteTable("admin_users", {
+  username: text("username").primaryKey(),
+  passwordHash: text("password_hash").notNull(),
+  passwordSalt: text("password_salt").notNull(),
+  role: text("role").notNull().default("user"),
+  canManageUsers: integer("can_manage_users", { mode: "boolean" }).notNull().default(false),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdBy: text("created_by").notNull(),
+  createdAt: text("created_at").notNull(),
+});

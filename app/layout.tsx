@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ServiceWorkerRegister } from "./service-worker-register";
 
 export const metadata: Metadata = {
   title: "Check-list de Frota LWART",
@@ -8,6 +9,7 @@ export const metadata: Metadata = {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
   },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
@@ -17,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">{children}<ServiceWorkerRegister /></body>
     </html>
   );
 }

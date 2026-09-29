@@ -1,0 +1,9 @@
+{
+  "name": "Check-list de Frota LWART",
+  "short_name": "Frota LWART",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f8fa",
+  "theme_color": "#12345a",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

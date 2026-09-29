@@ -22,6 +22,13 @@
       "when": 1790623226468,
       "tag": "0002_cooing_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790683000000,
+      "tag": "0003_admin_users",
+      "breakpoints": true
     }
   ]
 }
