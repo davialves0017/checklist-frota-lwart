@@ -27,6 +27,7 @@ export function DashboardClient() {
   const [type, setType] = useState("todos");
   const [selected, setSelected] = useState<Inspection | null>(null);
   const [editing, setEditing] = useState<Inspection | null>(null);
+  const [downloadMonth, setDownloadMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +56,7 @@ export function DashboardClient() {
   }), [data.inspections, query, type]);
   const uniqueFleets = new Set(data.inspections.map((item) => item.fleet)).size;
   const pending = data.inspections.filter((item) => item.problemCount > 0 && item.actionStatus !== "concluido").length;
+  const monthlyCount = data.inspections.filter((item) => item.inspectionDate.startsWith(downloadMonth)).length;
   const problemsByInspection = useMemo(() => new Map(data.inspections.map((inspection) => [inspection.id, data.problems.filter((problem) => problem.inspectionId === inspection.id)])), [data]);
 
   if (authorized === null || (loading && authorized === null)) return <div className="grid min-h-[55vh] place-items-center"><Loader2 className="h-8 w-8 animate-spin text-[#0b91ad]" /></div>;
@@ -64,6 +66,8 @@ export function DashboardClient() {
     <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 sm:py-10">
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-bold uppercase tracking-[.13em] text-[#0b91ad]">Visão geral</p><h2 className="mt-1 text-3xl font-bold text-[#12345a]">Resultado das inspeções</h2></div><Button variant="outline" onClick={logout}><LogOut className="mr-2 h-4 w-4" />Sair</Button></div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Metric icon={<ClipboardCheck />} label="Check-lists realizados" value={data.inspections.length} tone="blue" /><Metric icon={<Truck />} label="Frotas vistoriadas" value={uniqueFleets} tone="cyan" /><Metric icon={<AlertTriangle />} label="Problemas encontrados" value={data.problems.length} tone="amber" /><Metric icon={<CalendarClock />} label="Planos pendentes" value={pending} tone="red" /></div>
+
+      <Card className="mt-5 border-[#bcd6e2] bg-[#f8fcfd]"><CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="font-bold text-[#12345a]">Relatório mensal em PDF</p><p className="mt-1 text-sm text-[#587083]">Baixe todos os check-lists do mês em um único arquivo. {monthlyCount} {monthlyCount === 1 ? "check-list encontrado" : "check-lists encontrados"}.</p></div><div className="flex flex-col gap-3 sm:flex-row sm:items-end"><label><span className="mb-2 block text-sm font-semibold text-[#27465d]">Mês</span><Input type="month" value={downloadMonth} onChange={(event) => setDownloadMonth(event.target.value)} className="sm:w-44" /></label>{monthlyCount > 0 ? <Button asChild className="bg-[#12345a]"><a href={`/api/inspections/monthly-pdf?month=${downloadMonth}`} download><Download className="mr-2 h-4 w-4" />Baixar mês</a></Button> : <Button disabled><Download className="mr-2 h-4 w-4" />Baixar mês</Button>}</div></CardContent></Card>
 
       <Tabs defaultValue="inspections" className="mt-8">
         <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-xl bg-[#e3edf2] p-1 sm:w-auto"><TabsTrigger value="inspections" className="min-h-10 px-4">Inspeções</TabsTrigger><TabsTrigger value="problems" className="min-h-10 px-4">Problemas e planos</TabsTrigger></TabsList>
