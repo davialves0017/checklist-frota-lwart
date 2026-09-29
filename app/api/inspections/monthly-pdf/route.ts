@@ -17,7 +17,7 @@ type InspectionRow = {
   problemCount: number;
 };
 
-type AnswerRow = { itemNumber: number; question: string; response: string; comment: string; isProblem: number };
+type AnswerRow = { itemNumber: number; question: string; response: string; comment: string; isProblem: number; actionStatus: string; actionPlan: string; actionOwner: string; actionDueDate: string | null };
 
 export async function GET(request: Request) {
   if (!(await isAdminRequest(request))) return new Response("Não autorizado", { status: 401 });
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   const pageSize: [number, number] = [595.28, 841.89];
 
   for (const inspection of result.results) {
-    const answerResult = await env.DB.prepare(`SELECT item_number AS itemNumber, question, response, comment, is_problem AS isProblem FROM inspection_answers WHERE inspection_id = ? ORDER BY item_number`).bind(inspection.id).all<AnswerRow>();
+    const answerResult = await env.DB.prepare(`SELECT a.item_number AS itemNumber, a.question, a.response, a.comment, a.is_problem AS isProblem, a.action_status AS actionStatus, CASE WHEN a.action_plan != '' THEN a.action_plan ELSE i.action_plan END AS actionPlan, CASE WHEN a.action_owner != '' THEN a.action_owner ELSE i.action_owner END AS actionOwner, COALESCE(a.action_due_date, i.action_due_date) AS actionDueDate FROM inspection_answers a JOIN inspections i ON i.id = a.inspection_id WHERE a.inspection_id = ? ORDER BY a.item_number`).bind(inspection.id).all<AnswerRow>();
     let page = pdf.addPage(pageSize);
     let y = drawHeader(page, bold, inspection);
     const info = [
@@ -56,12 +56,14 @@ export async function GET(request: Request) {
     for (const answer of answerResult.results) {
       const questionLines = wrapText(`${answer.itemNumber}. ${answer.question}`, bold, 10.5, 505);
       const commentLines = answer.comment ? wrapText(`Observação: ${answer.comment}`, regular, 9.5, 505) : [];
-      const needed = questionLines.length * 14 + 18 + commentLines.length * 13 + 12;
+      const actionLines = answer.isProblem && answer.actionPlan ? [...wrapText(`Plano do item: ${answer.actionPlan}`, regular, 9.5, 505), ...wrapText(`Situação: ${formatActionStatus(answer.actionStatus)}    Responsável: ${answer.actionOwner}    Prazo: ${answer.actionDueDate ? formatDate(answer.actionDueDate) : "Não definido"}`, regular, 9.5, 505)] : [];
+      const needed = questionLines.length * 14 + 18 + (commentLines.length + actionLines.length) * 13 + 12;
       if (y - needed < 55) { page = pdf.addPage(pageSize); y = drawHeader(page, bold, inspection); }
       page.drawRectangle({ x: 35, y: y - needed + 7, width: 525, height: needed, color: answer.isProblem ? rgb(1, 0.95, 0.91) : rgb(0.96, 0.98, 0.99), borderColor: answer.isProblem ? rgb(0.76, 0.23, 0.18) : rgb(0.78, 0.85, 0.88), borderWidth: 0.7 });
       for (const line of questionLines) { page.drawText(safeText(line), { x: 45, y, size: 10.5, font: bold, color: rgb(0.07, 0.20, 0.35) }); y -= 14; }
       page.drawText(`Resposta: ${formatResponse(answer.response)}`, { x: 45, y, size: 10, font: regular, color: answer.isProblem ? rgb(0.65, 0.12, 0.12) : rgb(0.14, 0.42, 0.29) }); y -= 15;
       for (const line of commentLines) { page.drawText(safeText(line), { x: 45, y, size: 9.5, font: regular, color: rgb(0.30, 0.25, 0.20) }); y -= 13; }
+      for (const line of actionLines) { page.drawText(safeText(line), { x: 45, y, size: 9.5, font: regular, color: rgb(0.08, 0.38, 0.52) }); y -= 13; }
       y -= 12;
     }
 
@@ -104,6 +106,7 @@ function wrapText(value: string, font: PDFFont, size: number, maxWidth: number) 
 
 function safeText(value: string) { return value.replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/\u00a0/g, " "); }
 function formatResponse(value: string) { if (value === "sim") return "Sim"; if (value === "nao") return "Não"; if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return formatDate(value); return value; }
+function formatActionStatus(value: string) { return value === "concluido" ? "Concluído" : value === "em_andamento" ? "Em andamento" : "Pendente"; }
 function formatDate(value: string) { const [dateYear, dateMonth, day] = value.slice(0, 10).split("-"); return `${day}/${dateMonth}/${dateYear}`; }
 
 async function drawR2Image(pdf: PDFDocument, page: PDFPage, object: R2ObjectBody, x: number, y: number, maxWidth: number, maxHeight: number) {

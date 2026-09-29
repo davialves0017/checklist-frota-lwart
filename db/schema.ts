@@ -43,6 +43,12 @@ export const inspectionAnswers = sqliteTable(
     comment: text("comment").notNull().default(""),
     evidenceKey: text("evidence_key"),
     isProblem: integer("is_problem", { mode: "boolean" }).notNull().default(false),
+    actionStatus: text("action_status").notNull().default("pendente"),
+    actionPlan: text("action_plan").notNull().default(""),
+    actionOwner: text("action_owner").notNull().default(""),
+    actionDueDate: text("action_due_date"),
+    actionUpdatedAt: text("action_updated_at"),
+    actionUpdatedBy: text("action_updated_by"),
   },
   (table) => [
     index("idx_answers_inspection_id").on(table.inspectionId),
