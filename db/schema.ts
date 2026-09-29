@@ -21,6 +21,7 @@ export const inspections = sqliteTable(
     actionDueDate: text("action_due_date"),
     createdAt: text("created_at").notNull(),
     actionUpdatedAt: text("action_updated_at"),
+    actionUpdatedBy: text("action_updated_by"),
   },
   (table) => [
     index("idx_inspections_created_at").on(table.createdAt),
